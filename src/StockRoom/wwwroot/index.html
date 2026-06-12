@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StockRoom — inventory</title>
+<style>
+  :root {
+    --bg: #0d1117; --bg-card: #1c2330; --border: #2d3748;
+    --text: #e6edf3; --dim: #8b949e; --accent: #f0883e;
+    --green: #3fb950; --yellow: #d29922; --red: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font-family: "Segoe UI", system-ui, sans-serif; padding: 28px 36px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h1 .mark { color: var(--accent); }
+  .subtitle { color: var(--dim); margin: 0 0 24px; font-size: 15px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .stat-value { font-size: 26px; font-weight: 700; }
+  .stat-value.red { color: var(--red); }
+  .stat-value.green { color: var(--green); }
+  .stat-label { color: var(--dim); font-size: 13px; margin-top: 2px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .panel { margin-bottom: 26px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; color: var(--dim); font-size: 12px; text-transform: uppercase;
+       letter-spacing: 0.5px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--border); font-size: 14px; }
+  tr:last-child td { border-bottom: none; }
+  .qty { font-weight: 700; }
+  .low { color: var(--red); }
+  .badge { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.low { background: rgba(248,81,73,0.15); color: var(--red); }
+  .badge.ok { background: rgba(63,185,80,0.15); color: var(--green); }
+  .search { width: 320px; max-width: 100%; background: #161b22; border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text); padding: 9px 12px; font-size: 14px; margin-bottom: 14px; }
+  .search:focus { outline: 2px solid var(--accent); }
+  .muted { color: var(--dim); font-size: 13px; }
+  a { color: #58a6ff; text-decoration: none; }
+  .move { color: var(--dim); font-size: 13px; }
+</style>
+</head>
+<body>
+  <h1><span class="mark">▣</span> StockRoom</h1>
+  <p class="subtitle">Inventory at a glance — REST API at <a href="/swagger">/swagger</a> · <a href="/api/products/export.csv">export CSV</a></p>
+
+  <div class="stat-grid" id="stats"></div>
+
+  <div class="panel card">
+    <h2>Products</h2>
+    <input class="search" id="search" placeholder="Search name, SKU, or scan a barcode…" />
+    <table>
+      <thead><tr><th>SKU</th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>On hand</th><th>Status</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <div class="panel card">
+    <h2>Recent movements</h2>
+    <div id="movements" class="move"></div>
+  </div>
+
+<script>
+let all = [];
+
+async function load() {
+  const [products, value, lowStock, movements] = await Promise.all([
+    fetch('/api/products').then(r => r.json()),
+    fetch('/api/reports/inventory-value').then(r => r.json()),
+    fetch('/api/reports/low-stock').then(r => r.json()),
+    fetch('/api/movements?take=12').then(r => r.json()),
+  ]);
+  all = products;
+
+  document.getElementById('stats').innerHTML = `
+    <div class="card"><div class="stat-value">${value.productCount}</div><div class="stat-label">Products</div></div>
+    <div class="card"><div class="stat-value">${value.totalUnits}</div><div class="stat-label">Units on hand</div></div>
+    <div class="card"><div class="stat-value green">$${value.totalCostValue.toFixed(2)}</div><div class="stat-label">Stock value (cost)</div></div>
+    <div class="card"><div class="stat-value green">$${value.totalSaleValue.toFixed(2)}</div><div class="stat-label">Stock value (retail)</div></div>
+    <div class="card"><div class="stat-value ${lowStock.length ? 'red' : ''}">${lowStock.length}</div><div class="stat-label">Low-stock alerts</div></div>`;
+
+  render(document.getElementById('search').value);
+
+  document.getElementById('movements').innerHTML = movements.map(m =>
+    `${new Date(m.createdAtUtc + 'Z').toLocaleString()} — <strong>${m.kind}</strong> ${m.quantity} × ${m.productName}
+     <span class="muted">(${m.sku}${m.reference ? ' · ' + m.reference : ''}) → ${m.quantityAfter} on hand</span>`
+  ).join('<br>');
+}
+
+function render(filter) {
+  const f = (filter || '').toLowerCase();
+  const rows = all.filter(p =>
+    !f || p.name.toLowerCase().includes(f) || p.sku.toLowerCase().includes(f) || (p.barcode || '') === filter);
+  document.getElementById('rows').innerHTML = rows.map(p => `
+    <tr>
+      <td class="muted">${p.sku}</td>
+      <td>${p.name}</td>
+      <td class="muted">${p.category}</td>
+      <td>$${p.costPrice.toFixed(2)}</td>
+      <td>$${p.salePrice.toFixed(2)}</td>
+      <td class="qty ${p.isLowStock ? 'low' : ''}">${p.quantityOnHand}</td>
+      <td><span class="badge ${p.isLowStock ? 'low' : 'ok'}">${p.isLowStock ? 'reorder ≤ ' + p.reorderLevel : 'ok'}</span></td>
+    </tr>`).join('');
+}
+
+document.getElementById('search').addEventListener('input', e => render(e.target.value));
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>
