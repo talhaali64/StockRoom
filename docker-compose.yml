@@ -1,0 +1,10 @@
+services:
+  stockroom:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - stockroom-data:/data
+
+volumes:
+  stockroom-data:
