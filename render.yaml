@@ -1,0 +1,13 @@
+# Render Blueprint — deploy StockRoom free with one click.
+# New > Blueprint > pick this repo. No settings to fill in.
+services:
+  - type: web
+    name: stockroom
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      # Render routes traffic to port 10000 by default; bind ASP.NET there.
+      - key: ASPNETCORE_URLS
+        value: http://0.0.0.0:10000

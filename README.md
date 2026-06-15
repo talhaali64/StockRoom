@@ -42,6 +42,12 @@ docker compose up --build
 # → http://localhost:8080
 ```
 
+### Deploy to Render (free)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/talhaali64/StockRoom)
+
+One click → a live demo on Render's free tier, pre-seeded with a sample shop (including low-stock items) so the dashboard and reports populate immediately.
+
 ## REST API
 
 | Method | Route | Purpose |
